@@ -21,14 +21,16 @@
         }
     }
 
-    var currentModule = '',
-        currentLogs = [],
-        i,
-        testi = 0,
-        expect,
-        runassertions,
-        resultsEl = 0,
-        done;
+    var currentModule = ''
+    ,   currentLogs = []
+    ,   i
+    ,   testi = 0
+    ,   expect
+    ,   runassertions
+    ,   resultsEl = 0
+    ,   done
+    ,   logs
+    ,   failed;
 
     function results() {
         return resultsEl || (resultsEl = document.getElementById('qunit-testresult'));
@@ -49,11 +51,13 @@
     }
 
     QUnit.logging = {
+        logFailed: true,
+        logPassed: false,
         tabChar: '    ',
         testStart: function (a) { console.log(a) },
         testEnd: function (a) { console.log(); },
         log: function (a) { console.log(a) },
-        assertStart: function (a) { console.log(a) },
+        assertStart: function (a) { },
         assertEnd: function (a) { },
         error: function (a) { console.log(a) }
     };
@@ -88,12 +92,23 @@
                 i = 0;
                 runassertions = 0;
                 expect = expected || 0;
-                QUnit.logging.testStart('' + (++testi) + '. ' + currentModule + testName);
+                logs = [];
+                failed = false;
+                logs.push(['testStart', '' + (++testi) + '. ' + currentModule + testName]);
                 callback.call(this);
                 if (expect > runassertions) {
-                    QUnit.logging.error(indent(1) + (++i) + '. Expected ' + expect + ' assertions, but ' + runassertions + ' were run');
+                    logs.push(['error', indent(1) + (++i) + '. Expected ' + expect + ' assertions, but ' + runassertions + ' were run']);
                 }
-                QUnit.logging.testEnd();
+                if (QUnit.logging[failed ? 'logFailed' : 'logPassed'] === true) {
+                    var log;
+                    while ((log = logs.shift())) {
+                        if (log[0] === 'testStart' && failed) {
+                            log[1] += ' >>> FAILED!';
+                        }
+                        QUnit.logging[log[0]](log[1]);
+                    }
+                    QUnit.logging.testEnd();
+                }
                 complete();
             }
         };
@@ -106,17 +121,22 @@
 
     var QUnitPush = QUnit.push;
     QUnit.push = function (result, actual, expected, message) {
-        var source;
+        var source
+        ,   nexpected = QUnit.jsDump.parse(expected)
+        ,   nactual = QUnit.jsDump.parse(actual)
+        ,   log = '';
+
+        failed = failed || !result;
+
         ++runassertions;
-        QUnit.logging.assertStart(indent(2) + (++i) + '. ' + (message || (result ? "okay" : "failed")));
 
-        var nexpected = QUnit.jsDump.parse(expected);
-        var nactual = QUnit.jsDump.parse(actual);
+        logs.push(['assertStart', null]);
 
-        QUnit.logging[result ? 'log' : 'error'](indent(3) + 'Expected:' + tabUp(nexpected, 4));
+        log += indent(2) + (++i) + '. ' + (message || (failed ? "okay" : "failed")) + (result ? '': ' >>> FAILED!');
+        log += "\n" + indent(3) + 'Expected:' + tabUp(nexpected, 4);
 
-        if (nactual != nexpected) {
-            QUnit.logging.error(indent(3) + 'Result:' + tabUp(nactual, 4));
+        if (nexpected != nactual) {
+            log += "\n" + indent(3) + 'Result:' + tabUp(nactual, 4);
 
             var diff = QUnit.diff(nexpected, nactual);
             diff = diff.replace(/<\/ins><ins>/g, '').replace(/<\/del><del>/g, '').
@@ -125,14 +145,15 @@
                     return (rep.match(/^<\//) ? ret + '}' : '{' + ret);
                 });
 
-            QUnit.logging.error(indent(3) + 'Diff:' + tabUp(diff, 4));
+            log += "\n" + indent(3) + 'Diff:' + tabUp(diff, 4);
         }
 
         if (!result && (source = sourceFromStacktrace()) ) {
-            QUnit.logging.error(indent(3) + 'Source:' + tabUp(String(source).replace(/^\s+/, ''), 4));
+            log += "\n" + indent(3) + 'Source:' + tabUp(String(source).replace(/^\s+/, ''), 4);
         }
 
-        QUnit.logging.assertEnd();
+        logs.push([result ? 'log' : 'error', log]);
+        logs.push(['assertEnd', null]);
 
         return QUnitPush.apply(this, arguments);
     };
