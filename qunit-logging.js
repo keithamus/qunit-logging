@@ -42,8 +42,7 @@
             if (resultsEl.className && resultsEl.className === 'result') {
                 if (!done) {
                     done = true;
-                    summary = resultsEl.innerHTML.replace(/<\/?\w+(?:[\w\s="]+)>/g, ' ');
-                    QUnit.logging.log(summary);
+                    QUnit.logging.log(resultsEl.innerHTML.replace(/<\/?\w+(?:[\w\s="]+)>/g, ' '));
                 }
             }
         }, 0);
@@ -56,7 +55,7 @@
         log: function (a) { console.log(a) },
         assertStart: function (a) { console.log(a) },
         assertEnd: function (a) { },
-        error: function (a) { console.log(a) },
+        error: function (a) { console.log(a) }
     };
 
     function indent(i) { return (new Array(i || 1)).join(QUnit.logging.tabChar) }
